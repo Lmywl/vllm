@@ -4,6 +4,10 @@
 # vllm-flash-attn built from source
 vllm/vllm_flash_attn/*
 
+# vllm PD_DIS related
+examples/offline_inference/disaggregated-prefill-v1/local_storage/
+examples/offline_inference/disaggregated-prefill-v1/output.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

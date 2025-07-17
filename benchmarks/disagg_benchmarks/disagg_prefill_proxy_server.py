@@ -36,7 +36,7 @@ async def handle_request():
 
         # finish prefill
         async for _ in forward_request(
-            "http://localhost:8100/v1/completions", prefill_request
+            "http://localhost:8300/v1/completions", prefill_request
         ):
             continue
 
@@ -60,4 +60,4 @@ async def handle_request():
 
 
 if __name__ == "__main__":
-    app.run(port=8000)
+    app.run(port=8787)

@@ -79,8 +79,38 @@ else:
     xgr_torch_compile = LazyLoader(
         "xgr_torch_compile", globals(),
         "xgrammar.kernels.apply_token_bitmask_inplace_torch_compile")
-
 logger = init_logger(__name__)
+
+import logging, os
+def setup_custom_logger(logger_name, log_file, level=logging.INFO):
+    """
+    创建一个自定义名字的 logger,并将日志写入指定文件。
+
+    :param logger_name: 自定义 logger 名字（如 'my_custom_logger')
+    :param log_file: 日志文件路径（如 '/tmp/myapp.log')
+    :param level: 日志级别（如 logging.INFO)
+    :return: 配置好的 logger
+    """
+    # 创建 logger
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(level)
+    logger.propagate = False  # 防止重复日志（避免 root logger 再处理）
+
+    # 避免重复添加 handler
+    if not logger.handlers:
+        # 创建文件 handler
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        ))
+        # 添加 handler 到 logger
+        logger.addHandler(file_handler)
+    return logger
+
+worker_type = os.getenv("WORKER_TYPE")
+QPS = os.getenv("QPS")
+log_file_name = f'/root/paddlejob/workspace/env_run/output/liumengyuan/work/vllm_related/pd_disagg/logs/{worker_type}_{QPS}.log'
+my_own_logger = setup_custom_logger(__name__, log_file_name)
 
 
 class GPUModelRunner(LoRAModelRunnerMixin):
@@ -597,6 +627,9 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         req_ids = self.input_batch.req_ids
         tokens = [scheduler_output.num_scheduled_tokens[i] for i in req_ids]
         num_scheduled_tokens = np.array(tokens, dtype=np.int32)
+        sum_sche_tokens = sum(num_scheduled_tokens)
+
+        my_own_logger.info(f"Total num scheduled tokens: {sum_sche_tokens}")
         max_num_scheduled_tokens = max(tokens)
 
         # Get request indices.

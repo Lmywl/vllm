@@ -9,7 +9,8 @@ echo "🚧🚧 Warning: The usage of disaggregated prefill is experimental and s
 sleep 1
 
 # meta-llama/Meta-Llama-3.1-8B-Instruct or deepseek-ai/DeepSeek-V2-Lite
-MODEL_NAME=${HF_MODEL_NAME:-meta-llama/Meta-Llama-3.1-8B-Instruct}
+# MODEL_NAME=${HF_MODEL_NAME:-meta-llama/Meta-Llama-3.1-8B-Instruct}
+MODEL_NAME=/root/paddlejob/workspace/env_run/liumengyuan/models/qwen2.5_1.5B_Instruct
 
 # Trap the SIGINT signal (triggered by Ctrl+C)
 trap 'cleanup' INT
@@ -18,8 +19,8 @@ trap 'cleanup' INT
 cleanup() {
     echo "Caught Ctrl+C, cleaning up..."
     # Cleanup commands
-    pgrep python | xargs kill -9
-    pkill -f python
+    pgrep python3 | xargs kill -9
+    pgrep "vllm serve" | xargs kill -9
     echo "Cleanup complete. Exiting."
     exit 0
 }
@@ -47,13 +48,13 @@ wait_for_server() {
 # You can also adjust --kv-ip and --kv-port for distributed inference.
 
 # prefilling instance, which is the KV producer
-CUDA_VISIBLE_DEVICES=0 vllm serve $MODEL_NAME \
-    --port 8100 \
+CUDA_VISIBLE_DEVICES=2 vllm serve $MODEL_NAME \
+    --port 8300 \
     --max-model-len 100 \
     --gpu-memory-utilization 0.8 \
     --trust-remote-code \
     --kv-transfer-config \
-    '{"kv_connector":"PyNcclConnector","kv_role":"kv_producer","kv_rank":0,"kv_parallel_size":2}' &
+    '{"kv_connector":"SharedStorageConnector","kv_role":"kv_producer","kv_rank":0,"kv_parallel_size":2}' &
 
 # decoding instance, which is the KV consumer
 CUDA_VISIBLE_DEVICES=1 vllm serve $MODEL_NAME \
@@ -62,13 +63,13 @@ CUDA_VISIBLE_DEVICES=1 vllm serve $MODEL_NAME \
     --gpu-memory-utilization 0.8 \
     --trust-remote-code \
     --kv-transfer-config \
-    '{"kv_connector":"PyNcclConnector","kv_role":"kv_consumer","kv_rank":1,"kv_parallel_size":2}' &
+    '{"kv_connector":"SharedStorageConnector","kv_role":"kv_consumer","kv_rank":1,"kv_parallel_size":2}' &
 
 # wait until prefill and decode instances are ready
-wait_for_server 8100
+wait_for_server 8300
 wait_for_server 8200
 
-# launch a proxy server that opens the service at port 8000
+# launch a proxy server that opens the service at port 8787
 # the workflow of this proxy:
 # - send the request to prefill vLLM instance (port 8100), change max_tokens 
 #   to 1
@@ -77,10 +78,10 @@ wait_for_server 8200
 # NOTE: the usage of this API is subject to change --- in the future we will 
 # introduce "vllm connect" to connect between prefill and decode instances
 python3 ../../benchmarks/disagg_benchmarks/disagg_prefill_proxy_server.py &
-sleep 1
+sleep 5
 
 # serve two example requests
-output1=$(curl -X POST -s http://localhost:8000/v1/completions \
+output1=$(curl -X POST -s http://localhost:8787/v1/completions \
 -H "Content-Type: application/json" \
 -d '{
 "model": "'"$MODEL_NAME"'",
@@ -89,7 +90,7 @@ output1=$(curl -X POST -s http://localhost:8000/v1/completions \
 "temperature": 0
 }')
 
-output2=$(curl -X POST -s http://localhost:8000/v1/completions \
+output2=$(curl -X POST -s http://localhost:8787/v1/completions \
 -H "Content-Type: application/json" \
 -d '{
 "model": "'"$MODEL_NAME"'",
@@ -99,13 +100,12 @@ output2=$(curl -X POST -s http://localhost:8000/v1/completions \
 }')
 
 
-# Cleanup commands
-pgrep python | xargs kill -9
-pkill -f python
-
 echo ""
-
 sleep 1
+
+## clean proxy_server and vllm instances
+pgrep python3 | xargs kill -9  # delete proxy_server
+pkill -f "vllm serve"  # delete vllm instances
 
 # Print the outputs of the curl requests
 echo ""
@@ -114,3 +114,5 @@ echo "Output of second request: $output2"
 
 echo "🎉🎉 Successfully finished 2 test requests! 🎉🎉"
 echo ""
+
+

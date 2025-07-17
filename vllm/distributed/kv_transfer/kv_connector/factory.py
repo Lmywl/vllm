@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 logger = init_logger(__name__)
 
-
+import pdb
 class KVConnectorFactory:
     _registry: dict[str, Callable[[], type[KVConnectorBaseType]]] = {}
 
@@ -27,11 +27,16 @@ class KVConnectorFactory:
         """Register a connector with a lazy-loading module and class name."""
         if name in cls._registry:
             raise ValueError(f"Connector '{name}' is already registered.")
-
         def loader() -> type[KVConnectorBaseType]:
             module = importlib.import_module(module_path)
             return getattr(module, class_name)
-
+        # if name == "PyNcclConnector":
+        #     print(f"name={name}, module_path={module_path}, class_name={class_name}")
+        #     print(f"loader={loader}")
+        #     print(f"loader()={loader()}")
+        # if name == "SharedStorageConnector":
+        #     print(f"name={name}, module_path={module_path}, class_name={class_name}")
+        #     print(f"loader()={loader()}")
         cls._registry[name] = loader
 
     @classmethod
@@ -61,6 +66,7 @@ class KVConnectorFactory:
 
         kv_transfer_config = config.kv_transfer_config
         connector_name = kv_transfer_config.kv_connector
+        # print(connector_name)
         if connector_name in cls._registry:
             connector_cls = cls._registry[connector_name]()
         else:
@@ -70,6 +76,7 @@ class KVConnectorFactory:
                     f"Unsupported connector type: {connector_name}")
             connector_module = importlib.import_module(connector_module_path)
             connector_cls = getattr(connector_module, connector_name)
+        # print(type(connector_cls))
         assert issubclass(connector_cls, KVConnectorBase_V1)
         logger.info("Creating v1 connector with name: %s and engine_id: %s",
                     connector_name, kv_transfer_config.engine_id)
