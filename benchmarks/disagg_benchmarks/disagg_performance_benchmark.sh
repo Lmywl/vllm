@@ -128,6 +128,7 @@ main() {
   # (which lsof) || (apt-get -y install lsof)
 
   # pip install quart httpx matplotlib aiohttp datasets
+  # pip install lmcache
 
   cd "$(dirname "$0")"
 
