@@ -12,7 +12,7 @@
 # Decoding instance: force the input tokens be the same across requests to bypass prefilling
 
 set -ex
-model="/root/paddlejob/workspace/env_run/output/liumengyuan/models/qwen2.5_1.5B_Instruct"
+model="/root/paddlejob/workspace/env_run/output/liumengyuan/models/qwen2.5_7B"
 kill_gpu_processes() {
   # kill all processes on GPU.
   pgrep pt_main_thread | xargs -r kill -9
@@ -148,20 +148,20 @@ main() {
 
   export VLLM_HOST_IP=$(hostname -I | awk '{print $1}')
 
-  # launch_chunked_prefill
-  # for qps in 2 4 6 8; do
-  # benchmark $qps $default_output_len chunked_prefill
-  # done
-  # kill_gpu_processes
+  launch_chunked_prefill
+  for qps in 64 128 256; do
+  benchmark $qps $default_output_len chunked_prefill
+  done
+  kill_gpu_processes
   
   launch_disagg_prefill
-  for qps in 256; do
+  for qps in 64 128 256; do
   export QPS=$qps
   benchmark $qps $default_output_len disagg_prefill
   done
   kill_gpu_processes
 
-  # python3 visualize_benchmark_results.py
+  python3 visualize_benchmark_results.py
 
 }
 
